@@ -34,6 +34,11 @@ namespace Cloo.Compiler
                 Console.WriteLine("Error messages are formatted so that Visual Studio can properly parse them into the error list.");
                 return;
             }
+            if (ComputePlatform.Platforms.Count == 0)
+            {
+                Console.WriteLine("No OpenCL platform found.");
+                return;
+            }
             // retrieve target platform in the following order:
             // 1. match vendor name to the one given in the settings
             // 2. try to get the intel plattform (because the compiler has nice output)
@@ -41,6 +46,11 @@ namespace Cloo.Compiler
             var platform = ComputePlatform.Platforms.FirstOrDefault(_ => _.Vendor.Contains(Settings.Default.PlattformVendor)) ??
                            ComputePlatform.Platforms.FirstOrDefault(_ => _.Vendor.Contains(VendorIntel)) ??
                            ComputePlatform.Platforms[0];
+            if (platform.Devices.Count == 0)
+            {
+                Console.WriteLine("No OpenCL device found in the given platform.");
+                return;
+            }
             // try to parse device types from settings
             ComputeDeviceTypes deviceType;
             if (!Enum.TryParse(Settings.Default.DeviceType, true, out deviceType))
