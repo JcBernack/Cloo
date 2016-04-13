@@ -445,6 +445,31 @@ namespace Cloo
 
         #region ReadFromImage
 
+        public void ReadFromImage<T>(ComputeImage3D source, ref T[] destination, bool blocking, long destinationOffset, IList<ComputeEventBase> events)
+        {
+            ReadFromImage<T>(source, ref destination, blocking, new SysIntX3(), destinationOffset, new SysIntX3(source.Width, source.Height, (source.Depth == 0) ? 1 : source.Depth), 0, 0, events);
+        }
+
+        public void ReadFromImage<T>(ComputeImage3D source, ref T[] destination, bool blocking, SysIntX3 sourceOffset, long destinationOffset, SysIntX3 region, long sourceRowPitch, long sourceSlicePitch, IList<ComputeEventBase> events)
+        {
+            GCHandle destinationGCHandle = GCHandle.Alloc(destination, GCHandleType.Pinned);
+            IntPtr destinationOffsetPtr = Marshal.UnsafeAddrOfPinnedArrayElement(destination, (int)destinationOffset);
+
+            if (blocking)
+            {
+                Read(source, blocking, sourceOffset, region, sourceRowPitch, sourceSlicePitch, destinationOffsetPtr, events);
+                destinationGCHandle.Free();
+            }
+            else
+            {
+                bool userEventsWritable = (events != null && !events.IsReadOnly);
+                IList<ComputeEventBase> eventList = (userEventsWritable) ? events : Events;
+                Read(source, blocking, sourceOffset, region, sourceRowPitch, sourceSlicePitch, destinationOffsetPtr, eventList);
+                ComputeEvent newEvent = (ComputeEvent)eventList[eventList.Count - 1];
+                newEvent.TrackGCHandle(destinationGCHandle);
+            }
+        }
+
         /// <summary>
         /// Enqueues a command to read data from an image.
         /// </summary>
@@ -665,6 +690,36 @@ namespace Cloo
         #endregion
 
         #region WriteToImage
+
+        public void WriteToImage<T>(T[] source, ComputeImage3D destination, bool blocking, IList<ComputeEventBase> events)
+        {
+            WriteToImage(source, destination, blocking, 0, new SysIntX3(), new SysIntX3(destination.Width, destination.Height, (destination.Depth == 0) ? 1 : destination.Depth), 0, 0, events);
+        }
+
+        public void WriteToImage<T>(T[] source, ComputeImage3D destination, bool blocking, long sourceOffset, IList<ComputeEventBase> events)
+        {
+            WriteToImage(source, destination, blocking, sourceOffset, new SysIntX3(), new SysIntX3(destination.Width, destination.Height, (destination.Depth == 0) ? 1 : destination.Depth), 0, 0, events);
+        }
+
+        public void WriteToImage<T>(T[] source, ComputeImage3D destination, bool blocking, long sourceOffset, SysIntX3 destinationOffset, SysIntX3 region, long destinationRowPitch, long destinationSlicePitch, IList<ComputeEventBase> events)
+        {
+            var sourceGCHandle = GCHandle.Alloc(source, GCHandleType.Pinned);
+            var sourceOffsetPtr = Marshal.UnsafeAddrOfPinnedArrayElement(source, (int)sourceOffset);
+
+            if (blocking)
+            {
+                Write(destination, blocking, destinationOffset, region, destinationRowPitch, destinationSlicePitch, sourceOffsetPtr, events);
+                sourceGCHandle.Free();
+            }
+            else
+            {
+                var userEventsWritable = events != null && !events.IsReadOnly;
+                var eventList = userEventsWritable ? events : Events;
+                Write(destination, blocking, destinationOffset, region, destinationRowPitch, destinationSlicePitch, sourceOffsetPtr, eventList);
+                var newEvent = (ComputeEvent)eventList[eventList.Count - 1];
+                newEvent.TrackGCHandle(sourceGCHandle);
+            }
+        }
 
         /// <summary>
         /// Enqueues a command to write data to an image.
